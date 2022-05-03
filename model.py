@@ -1,3 +1,4 @@
+from cgi import test
 import pandas as pd
 import numpy as np
 import glob
@@ -95,7 +96,15 @@ def create_time_series_data(dir, samples_per_set, x_features, y_feature, driver=
             # Start next time series half way through the last time series
             i += int(samples_per_set / 2)
 
-    return x.astype(np.float64), y.astype(np.float64)
+    x = x.astype(np.float64)
+    y = y.astype(np.float64)
+    indices = np.random.permutation(x.shape[0])
+    train_indices, validate_indices, test_indices = \
+        indices[:int(x.shape[0]*0.8)], \
+        indices[int(x.shape[0]*0.8):int(x.shape[0]*0.9)], \
+        indices [int(x.shape[0]*0.9):]
+
+    return x[train_indices], y[train_indices], x[validate_indices], y[validate_indices], x[test_indices], y[test_indices]
 
 ## PyTorch Network
 class Net(nn.Module):
@@ -105,7 +114,7 @@ class Net(nn.Module):
         # Define layers
         self.conv1 = nn.Conv1d(num_features, 30, 3, stride=1, padding=2, device=self.device)
         self.conv2 = nn.Conv1d(30, 90, 5, stride=2, padding=3, device=self.device)
-        self.conv3 = nn.Conv1d(90, 1000, 7, stride=5, padding=5, device=self.device)
+        self.conv3 = nn.Conv1d(90, 1000, 7, stride=5, padding=4, device=self.device)
 
         # self.pool = nn.MaxPool1d(5)
 
@@ -113,7 +122,7 @@ class Net(nn.Module):
         self.dout2 = nn.Dropout(p=0.2)
         self.dout3 = nn.Dropout(p=0.5)
 
-        self.fc1 = nn.Linear(62000, 1800, device=self.device)
+        self.fc1 = nn.Linear(61000, 1800, device=self.device)
         self.fc2 = nn.Linear(1800, 200, device=self.device)
         self.fc3 = nn.Linear(200, 30, device=self.device)
         self.fc4 = nn.Linear(30, 1, device=self.device)
@@ -151,24 +160,33 @@ if __name__ == "__main__":
     epochs = 12
     batch_size = 100
 
-    # device = torch.device("cuda:0") 
-    device = torch.device("cpu")
+    device = torch.device("cuda:0") 
+    # device = torch.device("cpu")
 
-    x, y = create_time_series_data('data/', samples_per_time_series, x_features, y_feature)
+    x_train, y_train, x_val, y_val, x_test, y_test = create_time_series_data('data/', samples_per_time_series, x_features, y_feature)
     
     # TODO: train test
-    x_train = torch.from_numpy(x).type(torch.float32).to(device)
-    y_train = torch.from_numpy(y).to(device).to(torch.float32)
+    x_train = torch.from_numpy(x_train).type(torch.float32).to(device)
+    y_train = torch.from_numpy(y_train).to(device).to(torch.float32)
+    x_val = torch.from_numpy(x_val).type(torch.float32).to(device)
+    y_val = torch.from_numpy(y_val).to(device).to(torch.float32)
+    x_test = torch.from_numpy(x_test).type(torch.float32).to(device)
+    y_test = torch.from_numpy(y_test).to(device).to(torch.float32)
     
     # Create CNN, Loss Function, and Optomizer
-    model = Net(x.shape[1], device)
+    model = Net(x_train.shape[1], device)
     criterion = nn.BCEWithLogitsLoss() # Was cross entropy
     optimizer = optim.Adam(model.parameters(), lr=0.05)
     # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
+    # from torchsummary import summary
+    # print(summary(model, x[0].shape))
+
+
     for epoch in range(epochs):  # loop over the dataset multiple times
 
-        num_batches = int(np.floor(x.shape[0] / batch_size)) + 1
+        num_batches = int(np.floor(x_train.shape[0] / batch_size)) + 1
+        loss_sum = 0
         for batch in range(num_batches):
             # Create slice for batches data
             data_slice = slice(batch * batch_size, (batch + 1) * batch_size)
@@ -188,15 +206,22 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-            # print statistics
-            print("Loss: {}".format(loss.item()))
+            loss_sum += loss.item()
 
-        # TODO: Train/Val Accuracy
+        # print statistics
         prediction = model(x_train).cpu().detach().numpy()
-        accuracy = accuracy_score(y_train.cpu().detach().numpy(), (prediction >= 0.5).astype(np.float32))
-        print("Epoch {}/{}, Accuracy: {}".format(epoch+1, epochs, accuracy))
+        train_accuracy = accuracy_score(y_train.cpu().detach().numpy(), (prediction >= 0.5).astype(np.float32))
+        prediction = model(x_val).cpu().detach().numpy()
+        val_accuracy = accuracy_score(y_val.cpu().detach().numpy(), (prediction >= 0.5).astype(np.float32))
 
-    # out = net(x[0:3])
+        y_hat = model(x_val)
+        val_loss = criterion(y_hat, y_val)
+        
+        print("Epoch {}/{}, Train Accuracy: {}, Training Loss: {}, Validation Accuracy: {}, Validation Loss: {}".format( \
+            epoch+1, epochs, train_accuracy, loss_sum, val_accuracy, val_loss)
+        )
 
-    # print(out.shape)
-
+    # Print test performance
+    test_prediction = model(x_test).cpu().detach().numpy()
+    test_accuracy = accuracy_score(y_test.cpu().detach().numpy(), (test_prediction >= 0.5).astype(np.float32))
+    print("Testing Accuracy: {}".format(test_accuracy))
