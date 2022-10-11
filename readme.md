@@ -1,5 +1,11 @@
 # Distracted Driving Classifier
 
-- Overleaf link: https://www.overleaf.com/read/xngvbrnxfxvr
+Distracted driving is a leading cause of motor vehicle
+accidents. One of the most popular driver distractions is cellular
+phones. This study utilizes convolutional neural networks (CNNs)
+and time series data to predict if a driver is distracted. The
+features used will include sensor data and user input data from
+a automotive driving simulator. This paper will also detail the
+data collection techniques utilized in this study
 
-{google_docs}https://drive.google.com/file/d/1rF5cuUsbVm3u6oZYl2UYKE5MbrgZnqOR/view?usp=sharing {/google_docs}
+- Link to IEEE format report: https://www.overleaf.com/read/xngvbrnxfxvr
