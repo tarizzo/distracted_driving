@@ -8,4 +8,4 @@ features used will include sensor data and user input data from
 a automotive driving simulator. This paper will also detail the
 data collection techniques utilized in this study
 
-- Link to IEEE format report: https://www.overleaf.com/read/xngvbrnxfxvr
+- Link to IEEE format report: (PDF)[] {OVerleaf)[https://www.overleaf.com/read/xngvbrnxfxvr]
